@@ -5,6 +5,11 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
+use Carbon\Carbon;
+use App\Models\Image;
+
 
 class ImageController extends Controller
 {
@@ -59,40 +64,61 @@ class ImageController extends Controller
         }
 
         try {
-            $environment = $_ENV;
             $newImage = $request->file('newImage');    
-
-            $cloud_name = "de9d1foso";
+            
+            $environment = $_ENV;
             $preset = $environment['CLOUDINARY_UPLOAD_PRESET'];
+            $cloud_name = "de9d1foso";
 
-            $url = "https://api.cloudinary.com/v1_1/$cloud_name/image/upload";
-            $data = ['upload_preset' => "$preset", 'file' => $newImage];
+            $urlCloudinary = "https://api.cloudinary.com/v1_1/$cloud_name/image/upload";
 
-            dd($url, $data);
+            $imgEncoded = 'data:image/png;base64,'.base64_encode($newImage->get());
 
-            // use key 'http' even if you send the request to https://...
-            $options = [
-                'http' => [
-                    'header' => "Content-type: application/x-www-form-urlencoded\r\n",
-                    'method' => 'POST',
-                    'content' => http_build_query($data),
-                ],
-            ];
+            $data = array(
+                'upload_preset' => $preset,
+                'file' => $imgEncoded,
+            );
 
-            $context = stream_context_create($options);
-            $result = file_get_contents($url, false, $context);
-            if ($result === false) {
-                /* Handle error */
+            $postvars = http_build_query($data) . "\n";
+
+            // Sending to cloudinary
+            $ch = curl_init();
+
+            curl_setopt($ch, CURLOPT_URL, $urlCloudinary);
+            curl_setopt($ch, CURLOPT_POST, 1);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $postvars);
+
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+            $server_output = curl_exec ($ch);
+
+            $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            
+            curl_close ($ch);
+            $respDecoded = json_decode($server_output);
+
+            if($httpcode >= 400){
+                throw ValidationException::withMessages([
+                    'error' => 'Something wrong: '.$respDecoded->error->message
+                ]);
             }
 
-            var_dump($result);
+            // Save on the DB
+            $savedImage = Image::create([
+                'name' => $request->name,
+                'url' => $respDecoded->secure_url,
+            ]);
+            
+            return response()->json([
+                "msg" => "Great, image saved on database!",
+                "data" => $savedImage->getOriginal(),
+            ], 200); 
         } catch (\Throwable $th) {
-            //throw $th;
+            return response()->json([
+                "msg" => "Algo exploto",
+                "error" => $th->getMessage(),
+            ], 500);
         }
-
-        
-
-        // dd($request);
 
     }
 }

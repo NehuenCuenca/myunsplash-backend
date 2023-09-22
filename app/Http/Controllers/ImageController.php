@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
 use App\Models\Image;
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
+use Illuminate\Support\Facades\Artisan;
 
 
 class ImageController extends Controller
@@ -63,62 +65,48 @@ class ImageController extends Controller
             ], 400);
         }
 
-        try {
-            $newImage = $request->file('newImage');    
-            
-            $environment = $_ENV;
-            $preset = $environment['CLOUDINARY_UPLOAD_PRESET'];
-            $cloud_name = "de9d1foso";
-
-            $urlCloudinary = "https://api.cloudinary.com/v1_1/$cloud_name/image/upload";
-
-            $imgEncoded = 'data:image/png;base64,'.base64_encode($newImage->get());
-
-            $data = array(
-                'upload_preset' => $preset,
-                'file' => $imgEncoded,
-            );
-
-            $postvars = http_build_query($data) . "\n";
-
+        try {            
+            $nowTimestamp = Carbon::now()->timestamp;
             // Sending to cloudinary
-            $ch = curl_init();
-
-            curl_setopt($ch, CURLOPT_URL, $urlCloudinary);
-            curl_setopt($ch, CURLOPT_POST, 1);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $postvars);
-
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
-            $server_output = curl_exec ($ch);
-
-            $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            
-            curl_close ($ch);
-            $respDecoded = json_decode($server_output);
-
-            if($httpcode >= 400){
-                throw ValidationException::withMessages([
-                    'error' => 'Something wrong: '.$respDecoded->error->message
-                ]);
-            }
-
+            $uploadedFileUrl = $request->file('newImage')
+                                       ->storeOnCloudinaryAs('assets', $request->name.$nowTimestamp);
+            // dd($uploadedFileUrl->getSecurePath(), $uploadedFileUrl->getPublicId());
+           
             // Save on the DB
             $savedImage = Image::create([
                 'name' => $request->name,
-                'url' => $respDecoded->secure_url,
+                'url'  => $uploadedFileUrl->getSecurePath(),
+                'public_id' => $uploadedFileUrl->getPublicId(),
             ]);
             
             return response()->json([
-                "msg" => "Great, image saved on database!",
+                "msg"  => "Great, image saved on database!",
                 "data" => $savedImage->getOriginal(),
             ], 200); 
         } catch (\Throwable $th) {
+            // dd($th);
             return response()->json([
-                "msg" => "Algo exploto",
+                "msg" => "Something explode",
                 "error" => $th->getMessage(),
             ], 500);
         }
 
+    }
+
+    public function deleteImage($image_id, Request $request){
+        
+        $imageToDelete = Image::where('id', $image_id)->first(); 
+        if(!$imageToDelete){
+            return response()->json([
+                "msg" => "Image $image_id doesn't exist!.",
+            ], 500);
+        }
+
+        Cloudinary::admin()->deleteAssets([$imageToDelete->public_id]); // Delete from Cloudinary
+        $imageToDelete->delete(); //Delete from DB
+
+        return response()->json([
+            "msg" => "Image $image_id deleted succesfully.",
+        ], 200);
     }
 }

@@ -19,6 +19,7 @@ class ImageFactory extends Factory
         return [
             'name' => $this->faker->firstNameMale,
             'url' => 'https://res.cloudinary.com/de9d1foso/image/upload/v1694897621/qk7diaqvebigvqxx230r.jpg',
+            'public_id' => 'fake_image',
         ];
     }
 }

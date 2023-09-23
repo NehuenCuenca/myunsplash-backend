@@ -12,6 +12,11 @@ use App\Models\Image;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Support\Facades\Artisan;
 
+use Illuminate\Support\Str;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\File\File;
+
 
 class ImageController extends Controller
 {
@@ -29,8 +34,7 @@ class ImageController extends Controller
         } else {
             return response()->json([
                 "msj" => "All images",
-                "length" => count($allImages),
-                "data" => $allImages
+                "images" => $allImages
             ]);
         }
     }
@@ -51,15 +55,40 @@ class ImageController extends Controller
         } else {
             return response()->json([
                 "msj" => "Image",
-                // "length" => count($image),
-                "data" => $image
+                "image" => $image
             ]);
         }
     }
     
     public function addImage( Request $request)
     {
-        if (!$request->hasFile('newImage')) {
+        // $out = new \Symfony\Component\Console\Output\ConsoleOutput();
+        // $out->writeln('Something');
+
+
+        // https://stackoverflow.com/questions/58509456/how-to-convert-base64-image-to-uploadedfile-laravel
+        $base64File = $request->newImage;
+
+        // decode the base64 file
+        $fileData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $base64File));
+            
+        // save it to temporary dir first.
+        $tmpFilePath = sys_get_temp_dir() . '/' . Str::uuid()->toString();
+        file_put_contents($tmpFilePath, $fileData);
+            
+        // this just to help us get file info.
+        $tmpFile = new File($tmpFilePath);
+            
+        $file = new UploadedFile(
+            $tmpFile->getPathname(),
+            $tmpFile->getFilename(),
+            $tmpFile->getMimeType(),
+            0,
+            true // Mark it as test, since the file isn't from real HTTP POST.
+        );
+
+
+        if (!$request->newImage) {
             return response()->json([
                 "msg" => "There is no image on the request",
             ], 400);
@@ -68,8 +97,7 @@ class ImageController extends Controller
         try {            
             $nowTimestamp = Carbon::now()->timestamp;
             // Sending to cloudinary
-            $uploadedFileUrl = $request->file('newImage')
-                                       ->storeOnCloudinaryAs('assets', $request->name.$nowTimestamp);
+            $uploadedFileUrl = $file->storeOnCloudinaryAs('assets', $request->name.$nowTimestamp);
             // dd($uploadedFileUrl->getSecurePath(), $uploadedFileUrl->getPublicId());
            
             // Save on the DB
@@ -81,20 +109,23 @@ class ImageController extends Controller
             
             return response()->json([
                 "msg"  => "Great, image saved on database!",
-                "data" => $savedImage->getOriginal(),
+                "image" => $savedImage,
             ], 200); 
         } catch (\Throwable $th) {
             // dd($th);
             return response()->json([
                 "msg" => "Something explode",
                 "error" => $th->getMessage(),
+                "req" => $request
             ], 500);
         }
 
     }
 
     public function deleteImage($image_id, Request $request){
-        
+        $enviroment = $_ENV;
+        $passwordToCompare = $enviroment['MYUNSPLASH_PASSWORD'];
+
         $imageToDelete = Image::where('id', $image_id)->first(); 
         if(!$imageToDelete){
             return response()->json([
@@ -102,6 +133,13 @@ class ImageController extends Controller
             ], 500);
         }
 
+        $passwordIsIncorrect = strcmp($request->password , $passwordToCompare ) != 0;
+        if( $passwordIsIncorrect ){
+            return response()->json([
+                "msg" => "Password incorrect, try again!",
+            ], 500);
+        }
+        
         Cloudinary::admin()->deleteAssets([$imageToDelete->public_id]); // Delete from Cloudinary
         $imageToDelete->delete(); //Delete from DB
 

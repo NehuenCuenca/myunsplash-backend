@@ -28,15 +28,35 @@ class ImageController extends Controller
 
         if( $allImages->isEmpty() ){
             return response()->json([
-                "msj" => "Error",
+                "msg" => "Error",
                 "razon" => "There are no images saved :("
             ]);
         } else {
             return response()->json([
-                "msj" => "All images",
+                "msg" => "All images",
                 "images" => $allImages
             ]);
         }
+    }
+
+    public function getImagesByNameMatch($name_match, Request $request)
+    {
+        $imagesByNameMatch = Image::where('name', 'like', '%' . $name_match . '%')->get();
+
+        if( $imagesByNameMatch->isEmpty() ){
+            $allImages = Image::all();
+
+            return response()->json([
+                "msg" => "Error",
+                "razon" => "There are no images that match the name: '$name_match'",
+                "images" => $allImages
+            ], 400);
+        }
+
+        return response()->json([
+            "msg" => "Images that matches with the name: '$name_match'",
+            "matches" => $imagesByNameMatch
+        ], 200);
     }
 
     public function getImageById( $image_id, Request $request)
@@ -49,12 +69,12 @@ class ImageController extends Controller
 
         if( $image->isEmpty() ){
             return response()->json([
-                "msj" => "Error",
+                "msg" => "Error",
                 "razon" => "The image $image_id doesn't exist :("
             ]);
         } else {
             return response()->json([
-                "msj" => "Image",
+                "msg" => "Image",
                 "image" => $image
             ]);
         }

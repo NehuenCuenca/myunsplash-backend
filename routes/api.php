@@ -23,6 +23,7 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 // IMAGE ROUTE'S
 Route::get('images', [ImageController::class, 'getAllImages']);
+Route::get('images/{name_match}', [ImageController::class, 'getImagesByNameMatch']);
 Route::get('image/{image_id}', [ImageController::class, 'getImageById']);
 Route::post('image/add', [ImageController::class, 'addImage']);
 Route::delete('image/delete/{image_id}', [ImageController::class, 'deleteImage']);

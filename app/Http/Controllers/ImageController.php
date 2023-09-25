@@ -23,13 +23,13 @@ class ImageController extends Controller
     public function getAllImages(Request $request)
     {
 
-        $allImages= DB::table('images')->get();
+        $allImages= Image::orderBy('id', 'DESC')->get();
         //dd($allImages);
 
         if( $allImages->isEmpty() ){
             return response()->json([
                 "msg" => "Error",
-                "razon" => "There are no images saved :("
+                "reason" => "There are no images saved :("
             ]);
         } else {
             return response()->json([
@@ -48,7 +48,7 @@ class ImageController extends Controller
 
             return response()->json([
                 "msg" => "Error",
-                "razon" => "There are no images that match the name: '$name_match'",
+                "reason" => "There are no images that match the name: '$name_match'",
                 "images" => $allImages
             ], 400);
         }
@@ -62,19 +62,18 @@ class ImageController extends Controller
     public function getImageById( $image_id, Request $request)
     {
 
-        $image= DB::table('images')
-                        ->where('id', '=', $image_id)
+        $image= Image::where('id', '=', $image_id)
                         ->get();
         //dd($image);
 
         if( $image->isEmpty() ){
             return response()->json([
                 "msg" => "Error",
-                "razon" => "The image $image_id doesn't exist :("
+                "reason" => "The image $image_id doesn't exist :("
             ]);
         } else {
             return response()->json([
-                "msg" => "Image",
+                "msg" => "Image found",
                 "image" => $image
             ]);
         }
@@ -110,7 +109,8 @@ class ImageController extends Controller
 
         if (!$request->newImage) {
             return response()->json([
-                "msg" => "There is no image on the request",
+                "msg" => "Error",
+                "reason" => "There is no image on the request",
             ], 400);
         }
 
@@ -135,7 +135,7 @@ class ImageController extends Controller
             // dd($th);
             return response()->json([
                 "msg" => "Something explode",
-                "error" => $th->getMessage(),
+                "reason" => $th->getMessage(),
                 "req" => $request
             ], 500);
         }
@@ -149,14 +149,16 @@ class ImageController extends Controller
         $imageToDelete = Image::where('id', $image_id)->first(); 
         if(!$imageToDelete){
             return response()->json([
-                "msg" => "Image $image_id doesn't exist!.",
+                "msg" => "Error",
+                "reason" => "Image $image_id doesn't exist!.",
             ], 500);
         }
 
         $passwordIsIncorrect = strcmp($request->password , $passwordToCompare ) != 0;
         if( $passwordIsIncorrect ){
             return response()->json([
-                "msg" => "Password incorrect, try again!",
+                "msg" => "Error",
+                "reason" => "Password incorrect, try again!",
             ], 500);
         }
         

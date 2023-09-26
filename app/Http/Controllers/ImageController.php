@@ -55,7 +55,7 @@ class ImageController extends Controller
 
         return response()->json([
             "msg" => "Images that matches with the name: '$name_match'",
-            "matches" => $imagesByNameMatch
+            "images" => $imagesByNameMatch
         ], 200);
     }
 
